@@ -1,0 +1,8 @@
+Package: com.overlay.imgui
+Name: ImGuiOverlay
+Version: 1.0.0
+Architecture: iphoneos-arm
+Description: ImGui Performance Overlay with ESP
+Maintainer: Developer
+Author: Developer
+Section: System
