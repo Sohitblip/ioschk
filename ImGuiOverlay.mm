@@ -39,9 +39,9 @@
     if (self) {
         _showMenu = YES;
         _showFPS = YES;
-        _showESP = YES;
-        _showLines = YES;
-        _showBoxes = YES;
+        _showESP = NO;
+        _showLines = NO;
+        _showBoxes =  NO;
         _fps = 0.0f;
         _frameTime = 0.0f;
         _frameCount = 0;
