@@ -2,6 +2,8 @@
 #import <UIKit/UIKit.h>
 #import <Metal/Metal.h>
 #import <MetalKit/MetalKit.h>
+#include <pthread.h>
+#include <unistd.h>
 
 @interface OverlayWindow : UIWindow
 @end
@@ -11,7 +13,7 @@
     if ([ImGuiOverlay sharedInstance].showMenu) {
         return [super hitTest:point withEvent:event];
     }
-    CGRect toggleButtonRect = CGRectMake(10, 10, 130, 60);
+    CGRect toggleButtonRect = CGRectMake(10, 10, 140, 60);
     if (CGRectContainsPoint(toggleButtonRect, point)) {
         return [super hitTest:point withEvent:event];
     }
@@ -41,13 +43,15 @@
 - (void)viewDidLoad {
     [super viewDidLoad];
     self.view.backgroundColor = [UIColor clearColor];
-    
+
     id<MTLDevice> device = MTLCreateSystemDefaultDevice();
     if (!device) return;
 
     self.commandQueue = [device newCommandQueue];
-    
-    self.mtkView = [[MTKView alloc] initWithFrame:[UIScreen mainScreen].bounds device:device];
+    if (!self.commandQueue) return;
+
+    CGRect screenBounds = [UIScreen mainScreen].bounds;
+    self.mtkView = [[MTKView alloc] initWithFrame:screenBounds device:device];
     self.mtkView.delegate = self;
     self.mtkView.clearColor = MTLClearColorMake(0, 0, 0, 0);
     self.mtkView.backgroundColor = [UIColor clearColor];
@@ -71,6 +75,8 @@
     rpd.colorAttachments[0].storeAction = MTLStoreActionStore;
 
     id<MTLCommandBuffer> cmdBuf = [self.commandQueue commandBuffer];
+    if (!cmdBuf) return;
+
     [[ImGuiOverlay sharedInstance] beginFrameWithCommandBuffer:cmdBuf renderPassDescriptor:rpd];
 
     id<MTLRenderCommandEncoder> enc = [cmdBuf renderCommandEncoderWithDescriptor:rpd];
@@ -104,7 +110,7 @@
 
 static OverlayWindow *g_overlayWindow = nil;
 
-static void InitOverlay() {
+static void SetupOverlayWindow() {
     dispatch_async(dispatch_get_main_queue(), ^{
         UIWindowScene *scene = nil;
         for (UIScene *s in UIApplication.sharedApplication.connectedScenes) {
@@ -113,13 +119,13 @@ static void InitOverlay() {
                 break;
             }
         }
-        
+
         if (scene) {
             g_overlayWindow = [[OverlayWindow alloc] initWithWindowScene:scene];
         } else {
             g_overlayWindow = [[OverlayWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
         }
-        
+
         g_overlayWindow.windowLevel = UIWindowLevelAlert + 1000.0;
         g_overlayWindow.backgroundColor = [UIColor clearColor];
         g_overlayWindow.rootViewController = [[OverlayViewController alloc] init];
@@ -128,14 +134,15 @@ static void InitOverlay() {
     });
 }
 
+static void* SafeInitThread(void*) {
+    // Game engine aur splash screens load hone ke liye safe delay
+    sleep(6);
+    SetupOverlayWindow();
+    return NULL;
+}
+
 __attribute__((constructor))
 static void entry() {
-    [[NSNotificationCenter defaultCenter] addObserverForName:UIApplicationDidFinishLaunchingNotification
-                                                      object:nil
-                                                       queue:[NSOperationQueue mainQueue]
-                                                  usingBlock:^(NSNotification *note) {
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-            InitOverlay();
-        });
-    }];
+    pthread_t thread;
+    pthread_create(&thread, NULL, SafeInitThread, NULL);
 }
