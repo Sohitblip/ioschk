@@ -1,0 +1,42 @@
+name: Build iOS Dylib
+on:
+  push:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Download ImGui Dependencies
+        run: |
+          chmod +x ./get_imgui.sh
+          ./get_imgui.sh
+
+      - name: Compile Dylib via Native Apple Clang
+        run: |
+          mkdir -p output
+          xcrun -sdk iphoneos clang++ -arch arm64 -shared \
+            -std=c++17 -fobjc-arc -O2 \
+            -miphoneos-version-min=15.0 \
+            -framework UIKit -framework Foundation -framework CoreGraphics -framework Metal -framework MetalKit -framework QuartzCore \
+            -Wl,-headerpad_max_install_names \
+            -install_name @rpath/ImGuiOverlay.dylib \
+            -o output/ImGuiOverlay.dylib \
+            main.mm \
+            ImGuiOverlay.mm \
+            imgui.cpp \
+            imgui_draw.cpp \
+            imgui_tables.cpp \
+            imgui_widgets.cpp \
+            imgui_impl_metal.mm \
+            ESPManager.mm
+
+      - name: Upload Dylib Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ImGuiOverlay-dylib
+          path: output/ImGuiOverlay.dylib
